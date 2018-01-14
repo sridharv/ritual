@@ -9,7 +9,20 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func loadYAML(fileName string) (map[interface{}]interface{}, error) {
+// Item holds a single item which can be a task or some other thing that needs to be planned.
+type Item struct {
+	Name string                 `yaml:"name"`
+	Done bool                   `yaml:"done"`
+	Rest map[string]interface{} `yaml:",inline"`
+}
+
+// Collection holds a single logical collection of tasks and other things.
+type Collection struct {
+	Items []Item                 `yaml:"items"`
+	Rest  map[string]interface{} `yaml:",inline"`
+}
+
+func loadCollectionFile(fileName string) (*Collection, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -18,45 +31,23 @@ func loadYAML(fileName string) (map[interface{}]interface{}, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	m := map[interface{}]interface{}{}
-	if err = yaml.Unmarshal(data, &m); err != nil {
+	var c Collection
+	if err = yaml.Unmarshal(data, &c); err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return m, nil
-}
-
-func getMapList(m map[interface{}]interface{}, key string) []map[interface{}]interface{} {
-	v := m[key]
-	if ml, ok := v.([]interface{}); ok {
-		c := make([]map[interface{}]interface{}, len(ml))
-		for i, val := range ml {
-			if c[i], ok = val.(map[interface{}]interface{}); !ok {
-				panic(fmt.Sprintf("Expected map, got %T", val))
-			}
-		}
-		return c
-	}
-	return nil
-}
-
-func getString(m map[interface{}]interface{}, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
+	return &c, nil
 }
 
 func printFile() error {
-	m, err := loadYAML(os.Args[1])
+	c, err := loadCollectionFile(os.Args[1])
 	if err != nil {
 		return err
 	}
-	items := getMapList(m, "items")
-	for _, item := range items {
-		name := getString(item, "name")
-		if name != "" {
-			fmt.Println(name)
+	for _, item := range c.Items {
+		if item.Name == "" || item.Done {
+			continue
 		}
+		fmt.Println(item.Name)
 	}
 	return nil
 }
